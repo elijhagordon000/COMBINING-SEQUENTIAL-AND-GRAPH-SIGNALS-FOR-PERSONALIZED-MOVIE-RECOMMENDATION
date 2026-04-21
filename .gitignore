@@ -32,3 +32,6 @@ experiments/results/*
 *.pt
 *.pth
 *.ckpt
+
+#Notes
+personal_notes.txt
