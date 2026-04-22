@@ -1,4 +1,6 @@
 from src.data.build_sequences import load_ratings, build_user_sequences, split_user_sequences
+import torch
+from torch.utils.data import Dataset
 
 
 def pad_sequence(seq, max_len, pad_token=0):
@@ -30,6 +32,30 @@ def build_sasrec_examples(user_train, max_len=5):
 
     return examples
 
+
+class SASRecTorchDataset(Dataset):
+    """
+    Simple PyTorch dataset for SASRec training examples.
+
+    Each example looks like:
+        (user_id, padded_input_seq, target_item)
+    """
+
+    def __init__(self, examples):
+        self.examples = examples
+
+    def __len__(self):
+        return len(self.examples)
+
+    def __getitem__(self, idx):
+        user_id, input_seq, target_item = self.examples[idx]
+
+        input_seq_tensor = torch.tensor(input_seq, dtype=torch.long)
+        target_item_tensor = torch.tensor(target_item, dtype=torch.long)
+
+        return input_seq_tensor, target_item_tensor
+
+
 def main():
     ratings_path = "data/raw/ratings.csv"
 
@@ -39,11 +65,12 @@ def main():
 
     examples = build_sasrec_examples(user_train, max_len=5)
 
-    print("Number of training examples:", len(examples))
-    print()
+    dataset = SASRecTorchDataset(examples)
 
-    for ex in examples[:10]:
-        print(ex)
+    print("Dataset length:", len(dataset))
+    print("First item:", dataset[0])
+    print("Second item:", dataset[1])
+    print("Third item:", dataset[2])
 
 
 if __name__ == "__main__":
