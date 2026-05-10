@@ -1,11 +1,17 @@
-from src.data.build_sequences import load_ratings, build_user_sequences, split_user_sequences
+from src.data.build_sequences import (
+    load_ratings,
+    build_user_sequences,
+    split_user_sequences,
+)
+
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 
 def pad_sequence(seq, max_len, pad_token=0):
     """
     Pad a sequence on the left with pad_token so that its length becomes max_len.
+    If the sequence is too long, keep only the last max_len items.
     """
     if len(seq) > max_len:
         seq = seq[-max_len:]
@@ -19,6 +25,17 @@ def pad_sequence(seq, max_len, pad_token=0):
 def build_sasrec_examples(user_train, max_len=5):
     """
     Convert user training sequences into SASRec-style training examples.
+
+    Example:
+        [10, 20, 30, 40]
+    becomes:
+        [10] -> 20
+        [10, 20] -> 30
+        [10, 20, 30] -> 40
+
+    Returns:
+        examples: list of tuples
+            (user_id, padded_input_seq, target_item)
     """
     examples = []
 
@@ -35,8 +52,6 @@ def build_sasrec_examples(user_train, max_len=5):
 
 class SASRecTorchDataset(Dataset):
     """
-    Simple PyTorch dataset for SASRec training examples.
-
     Each example looks like:
         (user_id, padded_input_seq, target_item)
     """
@@ -56,21 +71,50 @@ class SASRecTorchDataset(Dataset):
         return input_seq_tensor, target_item_tensor
 
 
+def make_train_dataloader(user_train, max_len=5, batch_size=32, shuffle=True):
+    """
+    Build SASRec training examples, wrap them in a Dataset,
+    and return a PyTorch DataLoader.
+    """
+    examples = build_sasrec_examples(user_train, max_len=max_len)
+    dataset = SASRecTorchDataset(examples)
+
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle
+    )
+
+    return dataloader
+
+
 def main():
     ratings_path = "data/raw/ratings.csv"
 
+    # Load and preprocess
     df = load_ratings(ratings_path)
     user_sequences = build_user_sequences(df)
     user_train, user_val, user_test = split_user_sequences(user_sequences)
 
-    examples = build_sasrec_examples(user_train, max_len=5)
+    # Create DataLoader
+    train_loader = make_train_dataloader(
+        user_train,
+        max_len=5,
+        batch_size=32,
+        shuffle=True
+    )
 
-    dataset = SASRecTorchDataset(examples)
-
-    print("Dataset length:", len(dataset))
-    print("First item:", dataset[0])
-    print("Second item:", dataset[1])
-    print("Third item:", dataset[2])
+    # Inspect one batch
+    for input_batch, target_batch in train_loader:
+        print("Input batch shape:", input_batch.shape)
+        print("Target batch shape:", target_batch.shape)
+        print()
+        print("Input batch:")
+        print(input_batch)
+        print()
+        print("Target batch:")
+        print(target_batch)
+        break
 
 
 if __name__ == "__main__":
